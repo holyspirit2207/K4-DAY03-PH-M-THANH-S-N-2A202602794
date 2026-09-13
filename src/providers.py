@@ -36,27 +36,65 @@ class MockOfflineProvider(BaseLLMProvider):
 
     def generate_with_tools(self, prompt: str, tools_schema: List[Dict[str, Any]], system_prompt: str = "") -> Dict[str, Any]:
         prompt_lower = prompt.lower()
-        
-        # Mô phỏng nhận diện intent gọi Tool
-        if "sv2026001" in prompt_lower and "đặt lịch" in prompt_lower:
+
+        # Nếu đã có kết quả quan sát từ Tool (Observation), chuyển sang tổng hợp câu trả lời cuối cùng
+        if "[system tool observation" in prompt_lower:
             return {
-                "type": "tool_call",
-                "tool_name": "schedule_appointment",
-                "arguments": {"student_id": "SV2026001", "datetime_str": "14:00 15/09/2026", "advisor_name": "PGS.TS Nguyễn Văn A"},
-                "thought": "Người dùng yêu cầu đặt lịch hẹn tư vấn cho sinh viên SV2026001. Tôi sẽ gọi tool schedule_appointment."
+                "type": "text",
+                "content": "Dựa trên dữ liệu thời gian thực được tra cứu từ MCP Server của VinFast HR, hệ thống đã ghi nhận và phản hồi đầy đủ thông tin theo yêu cầu của bạn.",
+                "thought": "Đã nhận được kết quả Observation từ MCP Tool, tổng hợp câu trả lời cuối cùng cho nhân viên."
             }
-        elif "sv2026001" in prompt_lower or "tra cứu" in prompt_lower:
+
+        # Mô phỏng nhận diện intent gọi Tool — VinFast HR domain
+        # Trích xuất mã nhân viên từ prompt
+        if any(kw in prompt_lower for kw in ["quy định phép năm", "bao nhiêu ngày", "nhân viên mới có được"]):
+            return {
+                "type": "text",
+                "content": "Theo quy định nhân sự Tập đoàn VinFast: Nhân viên chính thức (toàn thời gian) được hưởng 12 ngày phép/năm. Nhân viên mới đang thử việc chưa được tính ngày phép năm hưởng lương (cần hoàn thành thử việc).",
+                "thought": "Câu hỏi tra cứu quy định chung VinFast HR, trả lời trực tiếp không cần gọi Tool."
+            }
+
+        import re
+        nv_match = re.search(r'nv\d+', prompt_lower)
+        employee_id = nv_match.group(0).upper() if nv_match else "NV001"
+
+        if any(kw in prompt_lower for kw in ["tạo đơn", "tạo đơn xin nghỉ", "xin nghỉ phép năm cho", "submit"]):
             return {
                 "type": "tool_call",
-                "tool_name": "academic_query",
-                "arguments": {"student_id": "SV2026001"},
-                "thought": "Người dùng muốn tra cứu thông tin học vụ của sinh viên SV2026001. Tôi sẽ gọi tool academic_query."
+                "tool_name": "submit_leave_request",
+                "arguments": {
+                    "employee_id": employee_id,
+                    "leave_type": "annual",
+                    "start_date": "20/09/2026",
+                    "end_date": "22/09/2026",
+                    "reason": "Nghỉ phép du lịch cùng gia đình"
+                },
+                "thought": f"Người dùng yêu cầu tạo đơn xin nghỉ phép cho nhân viên {employee_id}. Tôi sẽ gọi tool submit_leave_request."
+            }
+        elif any(kw in prompt_lower for kw in ["bảo hiểm", "bhxh", "bhyt", "bhtn", "insurance"]):
+            contract = "full_time"
+            if "part_time" in prompt_lower or "bán thời gian" in prompt_lower:
+                contract = "part_time"
+            elif "probation" in prompt_lower or "thử việc" in prompt_lower:
+                contract = "probation"
+            return {
+                "type": "tool_call",
+                "tool_name": "get_insurance_policy",
+                "arguments": {"contract_type": contract},
+                "thought": f"Người dùng muốn tra cứu chính sách bảo hiểm cho hợp đồng '{contract}'. Tôi sẽ gọi tool get_insurance_policy."
+            }
+        elif any(kw in prompt_lower for kw in ["phép", "ngày phép", "leave", "kiểm tra", "tra cứu", "nv"]):
+            return {
+                "type": "tool_call",
+                "tool_name": "check_leave_balance",
+                "arguments": {"employee_id": employee_id},
+                "thought": f"Người dùng muốn tra cứu số ngày phép của nhân viên {employee_id}. Tôi sẽ gọi tool check_leave_balance."
             }
         else:
             return {
                 "type": "text",
-                "content": f"[Mock Agent Response]: Xin chào! Quy chế học vụ VinUni yêu cầu sinh viên tích lũy tối thiểu 120 tín chỉ và duy trì GPA trên 2.0 để tốt nghiệp.",
-                "thought": "Câu hỏi chung về quy chế học vụ, trả lời trực tiếp không cần gọi Tool."
+                "content": "[Mock HR Response]: Quy định phép năm của VinFast: Nhân viên toàn thời gian được hưởng 12 ngày phép/năm (cộng thêm 1 ngày cho mỗi 5 năm làm việc). Nhân viên mới cần hoàn thành thời gian thử việc trước khi được tính phép năm.",
+                "thought": "Câu hỏi chung về quy định HR VinFast, trả lời trực tiếp không cần gọi Tool."
             }
 
 
@@ -64,7 +102,7 @@ class GeminiProvider(BaseLLMProvider):
     """Google Gemini Provider (Native Tool Calling với Google GenAI SDK)"""
     def __init__(self, api_key: str = None, model: str = None):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self.model_name = model or os.getenv("LLM_MODEL") or "gemini-2.5-flash"
+        self.model_name = model or os.getenv("LLM_MODEL") or "gemini-2.0-flash"
 
     def generate(self, prompt: str, system_prompt: str = "") -> str:
         if not self.api_key or self.api_key == "your_gemini_api_key_here":

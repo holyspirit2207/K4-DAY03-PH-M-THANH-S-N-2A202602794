@@ -1,0 +1,37 @@
+[
+  {
+    "id": "TC01",
+    "type": "direct_query",
+    "question": "Quy định phép năm của VinFast là bao nhiêu ngày? Nhân viên mới có được nghỉ phép ngay không?",
+    "expected_behavior": "Agent trả lời trực tiếp từ System Prompt về quy định phép năm chung, không cần gọi bất kỳ Tool nào.",
+    "complexity": "Low"
+  },
+  {
+    "id": "TC02",
+    "type": "single_tool_query",
+    "question": "Kiểm tra số ngày phép còn lại của nhân viên NV001.",
+    "expected_behavior": "Agent nhận diện nhu cầu tra cứu, tự động phát sinh Tool Call 'check_leave_balance' với mã NV001 và trả về số ngày phép còn lại.",
+    "complexity": "Medium"
+  },
+  {
+    "id": "TC03",
+    "type": "single_tool_query",
+    "question": "Chính sách bảo hiểm BHXH, BHYT và BHTN cho nhân viên hợp đồng toàn thời gian (full_time) của VinFast là gì?",
+    "expected_behavior": "Agent tự động phát sinh Tool Call 'get_insurance_policy' với contract_type='full_time' và trình bày đầy đủ tỷ lệ đóng BHXH, BHYT, BHTN.",
+    "complexity": "Medium"
+  },
+  {
+    "id": "TC04",
+    "type": "action_tool_call",
+    "question": "Tạo đơn xin nghỉ phép năm cho nhân viên NV002 từ ngày 20/09/2026 đến 22/09/2026, lý do nghỉ phép du lịch cùng gia đình.",
+    "expected_behavior": "Agent tự động phát sinh Tool Call 'submit_leave_request' với đầy đủ tham số và trả về mã đơn xin nghỉ phép thành công.",
+    "complexity": "High"
+  },
+  {
+    "id": "TC05",
+    "type": "edge_case_handling",
+    "question": "Kiểm tra số ngày phép còn lại của nhân viên NV999.",
+    "expected_behavior": "Agent nhận kết quả NOT_FOUND từ Tool 'check_leave_balance' và đưa ra phản hồi lịch sự, chính xác thông báo không tìm thấy mã nhân viên NV999.",
+    "complexity": "Medium"
+  }
+]
